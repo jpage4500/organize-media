@@ -1,0 +1,1 @@
+scp /Users/jpage/working/projects/organize-media/out/artifacts/organize_media_jar/organize-media.jar pi@192.168.0.103:/home/pi
