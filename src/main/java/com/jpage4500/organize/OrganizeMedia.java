@@ -14,8 +14,8 @@ public class OrganizeMedia {
     // min video size = 50 Meg
     private static final int MIN_VIDEO_LENGTH = 50 * 1000000;
 
-    private static Pattern TV_PATTERN = Pattern.compile("[sS][0-9][0-9][eE][0-9][0-9]");
-    private static Pattern YEAR_PATTERN = Pattern.compile("\\(?[12][90][0-9][0-9]\\)?");
+    private static final Pattern TV_PATTERN = Pattern.compile("[sS][0-9][0-9][eE][0-9][0-9]");
+    private static final Pattern YEAR_PATTERN = Pattern.compile("\\(?[12][90][0-9][0-9]\\)?");
 
     private static boolean isTestMode;
     private static File tvFolder;
@@ -66,21 +66,15 @@ public class OrganizeMedia {
     }
 
     // Examples:
-    // Tom.Clancys.Jack.Ryan.S03.COMPLETE.REPACK.720p.AMZN.WEBRip.x264-GalaxyTV[TGx]
-    //    Tom.Clancys.Jack.Ryan.S03E01.720p.AMZN.WEBRip.x264-GalaxyTV.mkv (379.6 MB)
-    // Glass.Onion.A.Knives.Out.Mystery.2022.720p.NF.WEBRip.900MB.x264-GalaxyRG[TGx]
-    //     Glass.Onion.A.Knives.Out.Mystery.2022.720p.NF.WEBRip.900MB.x264-GalaxyRG.mkv (903.4 MB)
-    // Avatar The Way of Water 2022 HDTS 1080p x264 AAC - QRips
-    //     Avatar The Way of Water 2022 HDTS 1080p x264 AAC - QRips.mkv (1.9 GB)
-    // Strange.World.2022.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA.mkv (1.6 GB)
-    // 1923.S01E02.720p.WEB.x265-MiNX[TGx]
-    //     1923.S01E02.720p.WEB.x265-MiNX.mkv (215.1 MB)
-    // Tulsa.King.S01E07.1080p.WEB.h264-TRUFFLE[TGx]
-    //     Tulsa.King.S01E07.1080p.WEB.h264-TRUFFLE.mkv (1.6 GB)
-    // Real.Time.with.Bill.Maher.S20E35.1080p.HEVC.x265-MeGusta[eztv.re].mkv
-    // Last.Week.Tonight.with.John.Oliver.S09E30.XviD-AFG[eztv.re].avi
-    // Avatar.The.Way.Of.Water.2022.UltraHD.HEVC.Dual.YG.mkv (13.2 GB)
-    // Avatar - The Way of Water (2022) [Hindi HQ Audio CAM RIP].mkv (5.4 GB)
+    // Tv.Show.Name.S03E01.720p.AMZN.WEBRip.x264-GalaxyTV.mkv (379.6 MB)
+    // Movie.Name.2022.720p.NF.WEBRip.900MB.x264-GalaxyRG.mkv (903.4 MB)
+    // Movie Name 2022 HDTS 1080p x264 AAC - QRips.mkv (1.9 GB)
+    // TV Show.S01E02.720p.WEB.x265-MiNX.mkv (215.1 MB)
+    // Tv.Show.S01E07.1080p.WEB.h264-TRUFFLE.mkv (1.6 GB)
+    // Tv.Show.S20E35.1080p.HEVC.x265-MeGusta[eztv.re].mkv
+    // Tv.Show.S09E30.XviD-AFG[eztv.re].avi
+    // Movie.Name.2022.UltraHD.HEVC.Dual.YG.mkv (13.2 GB)
+    // Movie - Name (2022) [Hindi HQ Audio CAM RIP].mkv (5.4 GB)
     private static FileInfo parseMedia(File file) {
         String name = file.getName();
         if (!isVideo(name)) {
