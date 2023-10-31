@@ -20,6 +20,7 @@ public class OrganizeMedia {
     private static boolean isTestMode;
     private static File tvFolder;
     private static File movieFolder;
+    private static File rootFile;
 
     public static void main(String[] args) {
         if (args.length < 3) {
@@ -29,7 +30,7 @@ public class OrganizeMedia {
 
         tvFolder = new File(args[0]);
         movieFolder = new File(args[1]);
-        File file = new File(args[2]);
+        rootFile = new File(args[2]);
 
         if (args.length > 3) {
             try {
@@ -41,18 +42,18 @@ public class OrganizeMedia {
             }
         }
 
-        System.out.println("running with: TV:" + tvFolder + ", MOVIE:" + movieFolder + ", ARG:" + file);
+        System.out.println("running with: TV:" + tvFolder + ", MOVIE:" + movieFolder + ", ARG:" + rootFile);
         if (!tvFolder.isDirectory()) {
             System.out.println("invalid TV folder: " + tvFolder);
             return;
         } else if (!movieFolder.isDirectory()) {
             System.out.println("invalid MOVIE folder: " + movieFolder);
             return;
-        } else if (!file.exists()) {
-            System.out.println("invalid FILE: " + file);
+        } else if (!rootFile.exists()) {
+            System.out.println("invalid FILE: " + rootFile);
             return;
         }
-        processFile(file);
+        processFile(rootFile);
     }
 
     private static void processFile(File file) {
@@ -66,13 +67,16 @@ public class OrganizeMedia {
     }
 
     // Examples:
+    // -- TV --
     // Tv.Show.Name.S03E01.720p.AMZN.WEBRip.x264-GalaxyTV.mkv (379.6 MB)
-    // Movie.Name.2022.720p.NF.WEBRip.900MB.x264-GalaxyRG.mkv (903.4 MB)
-    // Movie Name 2022 HDTS 1080p x264 AAC - QRips.mkv (1.9 GB)
     // TV Show.S01E02.720p.WEB.x265-MiNX.mkv (215.1 MB)
     // Tv.Show.S01E07.1080p.WEB.h264-TRUFFLE.mkv (1.6 GB)
     // Tv.Show.S20E35.1080p.HEVC.x265-MeGusta[eztv.re].mkv
     // Tv.Show.S09E30.XviD-AFG[eztv.re].avi
+    // Tv.Show.2018.S03E01.720p.NF.WEBRip.x264-GalaxyTV[TGx]
+    // -- MOVIE --
+    // Movie.Name.2022.720p.NF.WEBRip.900MB.x264-GalaxyRG.mkv (903.4 MB)
+    // Movie Name 2022 HDTS 1080p x264 AAC - QRips.mkv (1.9 GB)
     // Movie.Name.2022.UltraHD.HEVC.Dual.YG.mkv (13.2 GB)
     // Movie - Name (2022) [Hindi HQ Audio CAM RIP].mkv (5.4 GB)
     private static FileInfo parseMedia(File file) {
@@ -109,35 +113,29 @@ public class OrganizeMedia {
             }
 
             // look for season/episode
-            Matcher matcher = TV_PATTERN.matcher(part);
-            if (matcher.matches()) {
-                // TV show
-                fileInfo.type = MediaType.TYPE_TV;
-                fileInfo.tvVersion = part;
-                try {
-                    String seasonStr = part.substring(1, 3);
-                    fileInfo.season = Integer.parseInt(seasonStr);
-                } catch (Exception e) {
-                    System.out.println("Exception: " + part);
-                }
+            if (isPatternTv(part, fileInfo)) {
                 break;
             }
 
-            // look for year (not in first part)
+            // look for year
+            // ignore the first part to handle movies like "2001"
             if (i > 0) {
-                matcher = YEAR_PATTERN.matcher(part);
+                Matcher matcher = YEAR_PATTERN.matcher(part);
                 if (matcher.matches()) {
                     // got year
                     if (!TextUtils.startsWith(part, "(")) {
+                        // add year in parens "(year)"
                         part = "(" + part + ")";
-                        sb.append(" (" + part + ")");
-                        break;
-                    } else {
-                        // year is already in parens
-                        sb.append(' ');
-                        sb.append(part);
-                        break;
                     }
+                    sb.append(' ');
+                    sb.append(part);
+
+                    // this could be a movie or TV show - look at the next part to try and figure out which
+                    if (i + 1 < nameArr.length) {
+                        String nextPart = nameArr[i + 1];
+                        isPatternTv(nextPart, fileInfo);
+                    }
+                    break;
                 }
             }
 
@@ -157,39 +155,64 @@ public class OrganizeMedia {
         return fileInfo;
     }
 
-    private static void moveMedia(FileInfo fileInfo) {
-        File dest;
-        if (fileInfo.type == MediaType.TYPE_TV) {
-            dest = new File(tvFolder, fileInfo.name);
-        } else {
-            dest = new File(movieFolder, fileInfo.name);
+    private static boolean isPatternTv(String part, FileInfo fileInfo) {
+        Matcher matcher = TV_PATTERN.matcher(part);
+        if (matcher.matches()) {
+            // TV show
+            fileInfo.type = MediaType.TYPE_TV;
+            fileInfo.tvVersion = part;
+            try {
+                String seasonStr = part.substring(1, 3);
+                fileInfo.season = Integer.parseInt(seasonStr);
+            } catch (Exception e) {
+                System.out.println("isPatternTv: Exception: " + part + ", " + e.getMessage());
+            }
+            return true;
         }
+        return false;
+    }
+
+    private static File getDestFolder(FileInfo fileInfo) {
+        if (fileInfo.type == MediaType.TYPE_TV) {
+            return new File(tvFolder, fileInfo.name);
+        } else {
+            return new File(movieFolder, fileInfo.name);
+        }
+    }
+
+    private static void moveMedia(FileInfo fileInfo) {
+        File dest = getDestFolder(fileInfo);
         // create TV/Movie folder
         if (!isTestMode) {
             dest.mkdir();
         }
 
         // create full filename
+        File destFile;
         if (fileInfo.type == MediaType.TYPE_TV) {
             // "<show>/<show> S01E01.ext"
-            dest = new File(dest, fileInfo.name + " " + fileInfo.tvVersion + fileInfo.ext);
+            destFile = new File(dest, fileInfo.name + " " + fileInfo.tvVersion + fileInfo.ext);
         } else {
             // "<movie>/<movie> (YEAR).ext"
-            dest = new File(dest, fileInfo.name + fileInfo.ext);
+            destFile = new File(dest, fileInfo.name + fileInfo.ext);
         }
 
-        // move file to folder
-        System.out.println("Moving: " + fileInfo.file + " to: " + dest);
+        System.out.println("Moving: " + fileInfo.file + " to: " + destFile);
         if (!isTestMode) {
-            fileInfo.file.renameTo(dest);
+            // move file to folder
+            if (destFile.exists()) {
+                System.out.println("ALREADY EXISTS: " + destFile + " - FILE: " + fileInfo.file);
+                return;
+            }
+            fileInfo.file.renameTo(destFile);
         }
 
         // check for subtitle with matching name
         File subFile = FileUtils.replaceExt(fileInfo.file, ".srt");
         if (subFile != null && subFile.exists()) {
             // move to same folder
-            File destSubFile = FileUtils.replaceExt(dest, ".srt");
-            System.out.println("Moving: " + subFile + " to: " + destSubFile);
+            File destSubFile = FileUtils.replaceExt(destFile, ".srt");
+            System.out.println("Moving SUBTITLE: " + subFile + " to: " + destSubFile);
             if (!isTestMode && destSubFile != null) {
                 subFile.renameTo(destSubFile);
             }
@@ -204,7 +227,6 @@ public class OrganizeMedia {
     }
 
     enum MediaType {
-        TYPE_UNKNOWN,
         TYPE_MOVIE,
         TYPE_TV
     }
@@ -220,7 +242,6 @@ public class OrganizeMedia {
 
         public FileInfo(File file) {
             this.file = file;
-            type = MediaType.TYPE_UNKNOWN;
         }
     }
 

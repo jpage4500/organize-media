@@ -299,9 +299,11 @@ public class TextUtils {
     public static String toSentenceCase(String text) {
         StringBuilder sb = new StringBuilder();
         String[] stringArr = text.split(" ");
-        for (String word : stringArr) {
+        for (int i = 0; i < stringArr.length; i++) {
+            String word = stringArr[i];
             // ignore these words (all lowercase)
-            if (equalsIgnoreCaseAny(word, "a", "the", "of", "with", "to", "and")) {
+            // NOTE: always capatilize first word
+            if (i > 0 && equalsIgnoreCaseAny(word, "a", "the", "of", "with", "to", "and")) {
                 word = word.toLowerCase();
             } else {
                 word = word.substring(0, 1).toUpperCase() + word.substring(1).toLowerCase();
