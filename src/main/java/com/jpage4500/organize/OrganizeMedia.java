@@ -4,6 +4,7 @@ import com.jpage4500.organize.utils.FileUtils;
 import com.jpage4500.organize.utils.TextUtils;
 
 import java.io.File;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,6 +17,10 @@ public class OrganizeMedia {
 
     private static final Pattern TV_PATTERN = Pattern.compile("[sS][0-9][0-9][eE][0-9][0-9]");
     private static final Pattern YEAR_PATTERN = Pattern.compile("\\(?[12][90][0-9][0-9]\\)?");
+
+    private static final String[] VIDEO_EXT = new String[]{
+        ".mp4", ".avi", ".mkv", ".mov", ".wmv"
+    };
 
     private static boolean isTestMode;
     private static File tvFolder;
@@ -96,7 +101,7 @@ public class OrganizeMedia {
 
         int extPos = name.lastIndexOf('.');
         if (extPos > 0) {
-            fileInfo.ext = name.substring(extPos);
+            fileInfo.ext = name.substring(extPos).toLowerCase(Locale.US);
         }
 
         // -- get display name --
@@ -158,6 +163,7 @@ public class OrganizeMedia {
     private static boolean isPatternTv(String part, FileInfo fileInfo) {
         Matcher matcher = TV_PATTERN.matcher(part);
         if (matcher.matches()) {
+            part = part.toUpperCase(Locale.US);
             // TV show
             fileInfo.type = MediaType.TYPE_TV;
             fileInfo.tvVersion = part;
@@ -199,11 +205,12 @@ public class OrganizeMedia {
 
         System.out.println("Moving: " + fileInfo.file + " to: " + destFile);
         if (!isTestMode) {
-            // move file to folder
-            if (destFile.exists()) {
+            // check if video already exists at destination
+            if (isVideoExist(destFile)) {
                 System.out.println("ALREADY EXISTS: " + destFile + " - FILE: " + fileInfo.file);
                 return;
             }
+            // move file to folder
             fileInfo.file.renameTo(destFile);
         }
 
@@ -219,10 +226,29 @@ public class OrganizeMedia {
         }
     }
 
+    private static boolean isVideoExist(File file) {
+        // check if video file exists as-is
+        if (file.exists()) return true;
+        // also check if video file exists but with a different extension (.avi, .mkv, etc)
+        String path = file.getAbsolutePath().toLowerCase(Locale.US);
+        // remove extension from video
+        int pos = path.lastIndexOf('.');
+        if (pos < 0) return false;
+        path = path.substring(0, pos);
+        String origExt = path.substring(pos);
+        for (String ext : VIDEO_EXT) {
+            // ignore same extension as video
+            if (TextUtils.equals(origExt, ext)) continue;
+            File f = new File(path + ext);
+            if (f.exists()) {
+                System.out.println("isVideoExist: ALTERNATE found: " + f.getAbsolutePath() + ", " + file.getAbsolutePath());
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean isVideo(String name) {
-        String[] VIDEO_EXT = new String[]{
-            ".mp4", ".avi", ".mkv", ".mov", ".wmv"
-        };
         return TextUtils.endsWithIgnoreCase(name, VIDEO_EXT);
     }
 
