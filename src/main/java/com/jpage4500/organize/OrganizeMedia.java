@@ -1,9 +1,15 @@
 package com.jpage4500.organize;
 
+import com.jpage4500.organize.logging.AppLoggerFactory;
+import com.jpage4500.organize.logging.Log;
 import com.jpage4500.organize.utils.FileUtils;
+import com.jpage4500.organize.utils.GsonHelper;
 import com.jpage4500.organize.utils.TextUtils;
+import org.slf4j.LoggerFactory;
 
-import java.io.File;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -12,6 +18,8 @@ import java.util.regex.Pattern;
  *
  */
 public class OrganizeMedia {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OrganizeMedia.class);
+
     // min video size = 50 Meg
     private static final int MIN_VIDEO_LENGTH = 50 * 1000000;
 
@@ -26,8 +34,26 @@ public class OrganizeMedia {
     private static File tvFolder;
     private static File movieFolder;
     private static File rootFile;
+    private static File runScript;
+
+    /**
+     * configuring SLF4J custom logger implementation
+     * - call soon after Application:onCreate(); can be called again if debug mode changes
+     */
+    private static void setupLogging() {
+        AppLoggerFactory logger = (AppLoggerFactory) LoggerFactory.getILoggerFactory();
+        // tag prefix allows for easy filtering: ie: 'adb logcat | grep PM_'
+        //logger.setTagPrefix("DM");
+        // set log level that application should log at (and higher)
+        logger.setDebugLevel(Log.VERBOSE);
+        logger.setMainThreadId(Thread.currentThread().getId());
+        //logger.setLogToFile(true);
+        //logger.setFileLogLevel(Log.DEBUG);
+    }
 
     public static void main(String[] args) {
+        setupLogging();
+
         if (args.length < 3) {
             printUsage();
             System.exit(0);
@@ -38,12 +64,15 @@ public class OrganizeMedia {
         rootFile = new File(args[2]);
 
         if (args.length > 3) {
-            try {
-                isTestMode = TextUtils.equalsIgnoreCaseAny(args[3], "test");
-                if (isTestMode) {
-                    System.out.println("** TEST MODE **");
+            String arg4 = args[3];
+            if (TextUtils.equalsIgnoreCaseAny(arg4, "test")) {
+                isTestMode = true;
+                System.out.println("** TEST MODE **");
+            } else {
+                File arg4File = new File(arg4);
+                if (arg4File.exists()) {
+                    runScript = arg4File;
                 }
-            } catch (Exception e) {
             }
         }
 
@@ -211,7 +240,12 @@ public class OrganizeMedia {
                 return;
             }
             // move file to folder
-            fileInfo.file.renameTo(destFile);
+            boolean isOk = fileInfo.file.renameTo(destFile);
+            if (isOk) {
+                runScript(destFile);
+            } else {
+                System.out.println("ERROR: moving file: " + fileInfo.file + ", to: " + destFile);
+            }
         }
 
         // check for subtitle with matching name
@@ -252,6 +286,32 @@ public class OrganizeMedia {
         return TextUtils.endsWithIgnoreCase(name, VIDEO_EXT);
     }
 
+    private static void runScript(File dest) {
+        if (runScript == null) return;
+
+        ProcessBuilder processBuilder = new ProcessBuilder();
+        List<String> commandList = new ArrayList<>();
+        commandList.add(runScript.getAbsolutePath());
+        commandList.add(dest.getAbsolutePath());
+        processBuilder.command(commandList);
+        try {
+            System.out.println("running: " + runScript + ", param: " + dest);
+            Process process = processBuilder.start();
+            process.waitFor();
+
+            List<String> resultList = readInputStream(process.getInputStream());
+            if (!resultList.isEmpty()) {
+                log.trace("runScript: RESULTS: {}", GsonHelper.toJson(resultList));
+            }
+            List<String> errorList = readInputStream(process.getErrorStream());
+            if (!errorList.isEmpty()) {
+                log.error("runScript: ERROR: {}", GsonHelper.toJson(errorList));
+            }
+        } catch (Exception e) {
+            System.out.println("ERROR: " + e.getMessage());
+        }
+    }
+
     enum MediaType {
         TYPE_MOVIE,
         TYPE_TV
@@ -271,9 +331,32 @@ public class OrganizeMedia {
         }
     }
 
+    private static List<String> readInputStream(InputStream inputStream) {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+        String line;
+        List<String> resultList = new ArrayList<>();
+        try {
+            while (true) {
+                line = reader.readLine();
+                if (line == null) break;
+                else if (line.isEmpty()) continue;
+                //log.debug("runScript: {}", line);
+                resultList.add(line);
+            }
+            reader.close();
+        } catch (IOException e) {
+            log.error("readInputStream: Exception: {}", e.getMessage());
+        }
+        return resultList;
+    }
+
     private static void printUsage() {
         System.out.println("OrganizeMedia: Version: " + Build.versionName + ", Built: " + Build.buildDate);
         System.out.println("Usage:");
-        System.out.println("java OrganizeMedia <TV FOLDER> <MOVIE FOLDER> <media folder or file>");
+        System.out.println("java OrganizeMedia <TV FOLDER> <MOVIE FOLDER> <MEDIA (folder or file)> <SCRIPT>");
+        System.out.println("  - <TV FOLDER>: folder to move TV shows to");
+        System.out.println("  - <MOVIE FOLDER>: folder to move movies to");
+        System.out.println("  - <MEDIA>: folder or file to process");
+        System.out.println("  - <SCRIPT>: *optional script to run when complete. Will be run with destination tv/movie folder");
     }
 }
